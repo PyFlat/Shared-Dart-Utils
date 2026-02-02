@@ -28,12 +28,16 @@ class LogServicesGenerator extends Generator {
 
       for (final field in fields) {
         buffer.writeln(
-          '  ServiceLogger get ${field.name} => '
+          'ServiceLogger get ${field.name} => '
           'ServiceLogger(this, ${clazz.name}.${field.name});',
         );
       }
 
       buffer.writeln('}');
+
+      buffer.writeln(
+        'final List<LogService> all${clazz.name} = [${fields.map((f) => '${clazz.name}.${f.name}').join(', ')}];',
+      );
     }
 
     return buffer.toString();

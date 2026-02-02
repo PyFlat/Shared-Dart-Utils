@@ -12,7 +12,7 @@ class Services {
 }
 
 final logger = Logger(
-  services: [Services.app, Services.api, Services.db],
+  services: allServices,
   writeToFile: true,
   printTimestamp: false,
   onlyKeepLastLogFiles: 5,

@@ -12,3 +12,5 @@ extension ServicesLoggerExtension on Logger {
   ServiceLogger get api => ServiceLogger(this, Services.api);
   ServiceLogger get db => ServiceLogger(this, Services.db);
 }
+
+final List<LogService> allServices = [Services.app, Services.api, Services.db];
