@@ -3,17 +3,45 @@ import 'dart:io';
 
 import 'package:intl/intl.dart';
 
-const _reset = '\x1B[0m';
-const _red = '\x1B[31m';
-const _green = '\x1B[32m';
-const _yellow = '\x1B[33m';
-const _magenta = '\x1B[35m';
-const _cyan = '\x1B[36m';
-const _blue = '\x1B[34m';
-const _bold = '\x1B[1m';
-const _italic = '\x1B[3m';
+class LogStyle {
+  final String _ansi;
 
-enum LogLevel { start, debug, info, warn, error, critical }
+  const LogStyle._internal(this._ansi);
+
+  factory LogStyle.custom(String ansiCode) => LogStyle._internal(ansiCode);
+
+  static const none = LogStyle._internal('');
+  static const bold = LogStyle._internal('\x1B[1m');
+  static const italic = LogStyle._internal('\x1B[3m');
+  static const underline = LogStyle._internal('\x1B[4m');
+
+  static const black = LogStyle._internal('\x1B[30m');
+  static const red = LogStyle._internal('\x1B[31m');
+  static const green = LogStyle._internal('\x1B[32m');
+  static const yellow = LogStyle._internal('\x1B[33m');
+  static const blue = LogStyle._internal('\x1B[34m');
+  static const magenta = LogStyle._internal('\x1B[35m');
+  static const cyan = LogStyle._internal('\x1B[36m');
+  static const white = LogStyle._internal('\x1B[37m');
+
+  LogStyle operator +(LogStyle other) =>
+      LogStyle._internal(_ansi + other._ansi);
+
+  @override
+  String toString() => _ansi;
+
+  String apply(String message) => '$_ansi$message\x1B[0m';
+}
+
+enum LogLevel { debug, info, warn, error, critical }
+
+const _defaultLevelStyle = {
+  LogLevel.debug: LogStyle.cyan,
+  LogLevel.info: LogStyle.green,
+  LogLevel.warn: LogStyle.yellow,
+  LogLevel.error: LogStyle.red,
+  LogLevel.critical: LogStyle.magenta,
+};
 
 class LogService {
   final String name;
@@ -131,144 +159,47 @@ class Logger {
     }
   }
 
-  void _log(
+  void log(
     LogService service,
     LogLevel level,
     String message, {
+    LogStyle? style,
     bool printRawMessage = false,
     bool noPrint = false,
   }) {
     final timestamp = DateFormat(
       "yyyy.MM.dd-HH:mm:ss.SSS",
     ).format(DateTime.now());
+
     final levelStr = "[${level.name.toUpperCase()}]".padRight(
       longestLogLevelNameLength,
     );
     final serviceStr = "[${service.name.toUpperCase()}]".padRight(
       longestServiceNameLength,
     );
+
     final baseLine = '$levelStr$serviceStr $message';
     final timestampedLine = '[$timestamp]$baseLine';
+
+    final effectiveStyle =
+        (style ?? _defaultLevelStyle[level] ?? LogStyle.none);
+
+    final coloredTimestamped = effectiveStyle.apply(timestampedLine);
+    final coloredBase = effectiveStyle.apply(baseLine);
+
     if (_fileSink != null) {
-      final coloredLine = '${_colorForLevel(level)}$timestampedLine$_reset';
-      _fileSink?.writeln(coloredLine);
+      _fileSink!.writeln(coloredTimestamped);
     }
+
     _streamController.add(timestampedLine);
+
     if (!service.disable && !printRawMessage && !noPrint) {
-      final line = printTimestamp ? timestampedLine : baseLine;
-      final coloredLine = '${_colorForLevel(level)}$line$_reset';
-      stdout.writeln(coloredLine);
+      stdout.writeln(printTimestamp ? coloredTimestamped : coloredBase);
     }
+
     if (printRawMessage) {
       stdout.writeln(message);
     }
-  }
-
-  String _colorForLevel(LogLevel level) {
-    switch (level) {
-      case LogLevel.start:
-        return _bold + _blue + _italic;
-      case LogLevel.debug:
-        return _cyan;
-      case LogLevel.info:
-        return _green;
-      case LogLevel.warn:
-        return _yellow;
-      case LogLevel.error:
-        return _red;
-      case LogLevel.critical:
-        return _magenta;
-    }
-  }
-
-  void start(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.start,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
-  }
-
-  void debug(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.debug,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
-  }
-
-  void info(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.info,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
-  }
-
-  void warn(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.warn,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
-  }
-
-  void error(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.error,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
-  }
-
-  void critical(
-    LogService service,
-    String message, {
-    bool printRawMessage = false,
-    bool noPrint = false,
-  }) {
-    _log(
-      service,
-      LogLevel.critical,
-      message,
-      printRawMessage: printRawMessage,
-      noPrint: noPrint,
-    );
   }
 
   Stream<String> get logStream => _streamController.stream;
@@ -277,4 +208,81 @@ class Logger {
     _fileSink?.close();
     _streamController.close();
   }
+}
+
+class ServiceLogger {
+  final Logger _logger;
+  final LogService service;
+
+  const ServiceLogger(this._logger, this.service);
+
+  void debug(
+    String m, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) => _logger.log(
+    service,
+    LogLevel.debug,
+    m,
+    style: style,
+    printRawMessage: printRawMessage,
+    noPrint: noPrint,
+  );
+
+  void info(
+    String m, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) => _logger.log(
+    service,
+    LogLevel.info,
+    m,
+    style: style,
+    printRawMessage: printRawMessage,
+    noPrint: noPrint,
+  );
+
+  void warn(
+    String m, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) => _logger.log(
+    service,
+    LogLevel.warn,
+    m,
+    style: style,
+    printRawMessage: printRawMessage,
+    noPrint: noPrint,
+  );
+
+  void error(
+    String m, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) => _logger.log(
+    service,
+    LogLevel.error,
+    m,
+    style: style,
+    printRawMessage: printRawMessage,
+    noPrint: noPrint,
+  );
+
+  void critical(
+    String m, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) => _logger.log(
+    service,
+    LogLevel.critical,
+    m,
+    style: style,
+    printRawMessage: printRawMessage,
+    noPrint: noPrint,
+  );
 }

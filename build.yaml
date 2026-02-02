@@ -1,0 +1,16 @@
+builders:
+  log_services:
+    import: "package:shared_utils/tool/log_services_generator.dart"
+    builder_factories: ["logServicesBuilder"]
+    build_extensions: { ".dart": [".service_logger.g.dart"] }
+    auto_apply: dependents
+    build_to: source
+    applies_builders: ["source_gen|combining_builder"]
+
+targets:
+  $default:
+    builders:
+      shared_utils|log_services:
+        generate_for:
+          - lib/**
+          - example/**

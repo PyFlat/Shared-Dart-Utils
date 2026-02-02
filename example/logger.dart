@@ -1,9 +1,14 @@
 import 'package:shared_utils/shared_utils.dart';
 
-extension Services on LogService {
+part 'logger.service_logger.g.dart';
+
+@logServices
+class Services {
   static LogService app = LogService('app');
   static LogService api = LogService('api');
   static LogService db = LogService('database');
+
+  static String xyz = 'not a log service';
 }
 
 final logger = Logger(
@@ -14,10 +19,13 @@ final logger = Logger(
 );
 
 void main() {
-  logger.start(Services.app, "Application started");
-  logger.debug(Services.app, "Debugging application");
-  logger.info(Services.api, "Fetching data from API");
-  logger.warn(Services.db, "Database connection is slow");
-  logger.error(Services.app, "Unhandled exception occurred");
-  logger.critical(Services.api, "API service is down");
+  logger.app.info(
+    "Application started",
+    style: LogStyle.bold + LogStyle.blue + LogStyle.italic,
+  );
+  logger.app.debug("Debugging application");
+  logger.api.info("Fetching data from API");
+  logger.db.warn("Database connection is slow");
+  logger.app.error("Unhandled exception occurred");
+  logger.api.critical("API service is down");
 }
