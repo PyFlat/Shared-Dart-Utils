@@ -12,6 +12,7 @@ dependencies:
   build: ^4.0.4
   intl: ^0.20.2
   path: ^1.9.0
+  shelf: ^1.4.2
   source_gen: ^4.2.0
 
 dev_dependencies:

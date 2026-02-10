@@ -5,7 +5,7 @@ part 'logger.service_logger.g.dart';
 @logServices
 class Services {
   static LogService app = LogService('app');
-  static LogService api = LogService('api');
+  static LogService api = LogService('api', disable: true);
   static LogService db = LogService('database');
 
   static String xyz = 'not a log service';
@@ -15,7 +15,7 @@ final logger = Logger(
   services: allServices,
   writeToFile: true,
   printTimestamp: false,
-  onlyKeepLastLogFiles: 5,
+  onlyKeepLastLogFiles: 1,
 );
 
 void main() {
