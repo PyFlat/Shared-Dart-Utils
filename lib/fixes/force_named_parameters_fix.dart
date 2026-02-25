@@ -7,7 +7,7 @@ import 'package:analyzer_plugin/utilities/range_factory.dart';
 
 class ConvertToNamedParameters extends ResolvedCorrectionProducer {
   static const _fixKind = FixKind(
-    'shared_utils.fix.convertToNamed',
+    'pyflat_shared_utils.fix.convertToNamed',
     DartFixKindPriority.standard,
     "Convert to named parameters",
   );
