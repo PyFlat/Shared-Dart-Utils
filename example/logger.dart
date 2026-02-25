@@ -1,4 +1,4 @@
-import 'package:shared_utils/shared_utils.dart';
+import 'package:pyflat_shared_utils/pyflat_shared_utils.dart';
 
 part 'logger.service_logger.g.dart';
 
