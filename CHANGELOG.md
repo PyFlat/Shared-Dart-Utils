@@ -1,3 +1,7 @@
+## 0.0.4
+
+- Added isolate forward port to make it possible to log from within an isolate
+
 ## 0.0.3
 
 - Fixed timed logs to not break when logging afterwards

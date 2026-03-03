@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:intl/intl.dart';
 
@@ -90,6 +91,8 @@ class Logger {
   final Map<int, String> _activeTasks = {};
   int _taskIdCounter = 0;
 
+  SendPort? isolateForwardPort;
+
   Logger({
     required this.services,
     this.writeToFile = true,
@@ -97,6 +100,7 @@ class Logger {
     this.deleteOldLogFilesOnStartup = true,
     this.keepDays = 14,
     this.onlyKeepLastLogFiles = -1,
+    this.isolateForwardPort,
   }) {
     if (writeToFile) {
       Directory('logs').createSync(recursive: true);
@@ -199,6 +203,19 @@ class Logger {
     bool printRawMessage = false,
     bool noPrint = false,
   }) {
+    if (isolateForwardPort != null) {
+      isolateForwardPort!.send({
+        'type': 'log',
+        'service': service.name,
+        'level': level.name,
+        'message': message,
+        'style': style?.toString() ?? '',
+        'printRawMessage': printRawMessage,
+        'noPrint': noPrint,
+      });
+      return;
+    }
+
     final timestamped = _formatLine(
       service,
       level,
