@@ -159,13 +159,12 @@ class Logger {
     }
   }
 
-  void log(
+  String _formatLine(
     LogService service,
     LogLevel level,
     String message, {
     LogStyle? style,
-    bool printRawMessage = false,
-    bool noPrint = false,
+    bool includeTimestamp = false,
   }) {
     final timestamp = DateFormat(
       "yyyy.MM.dd-HH:mm:ss.SSS",
@@ -174,31 +173,123 @@ class Logger {
     final levelStr = "[${level.name.toUpperCase()}]".padRight(
       longestLogLevelNameLength,
     );
+
     final serviceStr = "[${service.name.toUpperCase()}]".padRight(
       longestServiceNameLength,
     );
 
     final baseLine = '$levelStr$serviceStr $message';
-    final timestampedLine = '[$timestamp]$baseLine';
+
+    final rawLine = includeTimestamp ? '[$timestamp]$baseLine' : baseLine;
 
     final effectiveStyle =
         (style ?? _defaultLevelStyle[level] ?? LogStyle.none);
 
-    final coloredTimestamped = effectiveStyle.apply(timestampedLine);
-    final coloredBase = effectiveStyle.apply(baseLine);
+    return effectiveStyle.apply(rawLine);
+  }
+
+  void log(
+    LogService service,
+    LogLevel level,
+    String message, {
+    LogStyle? style,
+    bool printRawMessage = false,
+    bool noPrint = false,
+  }) {
+    final formatted = _formatLine(
+      service,
+      level,
+      message,
+      style: style,
+      includeTimestamp: printTimestamp,
+    );
+
+    final timestamped = _formatLine(
+      service,
+      level,
+      message,
+      style: style,
+      includeTimestamp: true,
+    );
 
     if (_fileSink != null) {
-      _fileSink!.writeln(coloredTimestamped);
+      _fileSink!.writeln(timestamped);
     }
 
-    _streamController.add(timestampedLine);
+    _streamController.add(timestamped);
 
     if (!service.disable && !printRawMessage && !noPrint) {
-      stdout.writeln(printTimestamp ? coloredTimestamped : coloredBase);
+      stdout.writeln(printTimestamp ? timestamped : formatted);
     }
 
     if (printRawMessage) {
       stdout.writeln(message);
+    }
+  }
+
+  Future<T> timedTask<T>(
+    LogService service,
+    LogLevel level,
+    String message,
+    Future<T> Function() task, {
+    LogStyle? style,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+
+    void render() {
+      if (service.disable || !stdout.hasTerminal) return;
+
+      final elapsed = (stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1);
+
+      final timedMessage = '$message (${elapsed}s)';
+
+      final formatted = _formatLine(
+        service,
+        level,
+        timedMessage,
+        style: style,
+        includeTimestamp: printTimestamp,
+      );
+
+      stdout.write('\r\x1B[2K$formatted');
+    }
+
+    render();
+
+    final timer = Timer.periodic(
+      const Duration(milliseconds: 50),
+      (_) => render(),
+    );
+
+    try {
+      final result = await task();
+
+      timer.cancel();
+      stopwatch.stop();
+
+      if (stdout.hasTerminal) {
+        stdout.write('\r\x1B[2K');
+      }
+
+      log(
+        service,
+        level,
+        '$message (${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s|${stopwatch.elapsedMilliseconds}ms)',
+        style: style,
+      );
+
+      return result;
+    } catch (e) {
+      timer.cancel();
+      stopwatch.stop();
+
+      if (stdout.hasTerminal) {
+        stdout.write('\r\x1B[2K');
+      }
+
+      log(service, level, '$message FAILED', style: style);
+
+      rethrow;
     }
   }
 
@@ -285,4 +376,11 @@ class ServiceLogger {
     printRawMessage: printRawMessage,
     noPrint: noPrint,
   );
+
+  Future<T> timed<T>(
+    String message,
+    Future<T> Function() task, {
+    LogLevel level = LogLevel.info,
+    LogStyle? style,
+  }) => _logger.timedTask(service, level, message, task);
 }
