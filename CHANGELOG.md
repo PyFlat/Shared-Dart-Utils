@@ -1,3 +1,7 @@
+## 0.0.3
+
+- Fixed timed logs to not break when logging afterwards
+
 ## 0.0.2
 
 - Added support for timed logs

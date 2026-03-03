@@ -24,9 +24,17 @@ void main() async {
     style: LogStyle.bold + LogStyle.blue + LogStyle.italic,
   );
   logger.app.debug("Debugging application");
+  logger.api
+      .timed('Fetching more data', () async {
+        await Future.delayed(Duration(seconds: 10));
+        return 'More data fetched';
+      })
+      .then((result) {
+        logger.api.info(result);
+      });
 
-  await logger.api.timed('Fetching data from API', () async {
-    await Future.delayed(Duration(seconds: 2));
+  logger.api.timed('Fetching data from API', () async {
+    await Future.delayed(Duration(seconds: 5));
     return 'Data fetched';
   });
 

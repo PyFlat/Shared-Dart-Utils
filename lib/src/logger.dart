@@ -87,6 +87,9 @@ class Logger {
   late int longestServiceNameLength;
   late int longestLogLevelNameLength;
 
+  final Map<int, String> _activeTasks = {};
+  int _taskIdCounter = 0;
+
   Logger({
     required this.services,
     this.writeToFile = true,
@@ -196,14 +199,6 @@ class Logger {
     bool printRawMessage = false,
     bool noPrint = false,
   }) {
-    final formatted = _formatLine(
-      service,
-      level,
-      message,
-      style: style,
-      includeTimestamp: printTimestamp,
-    );
-
     final timestamped = _formatLine(
       service,
       level,
@@ -212,18 +207,31 @@ class Logger {
       includeTimestamp: true,
     );
 
-    if (_fileSink != null) {
-      _fileSink!.writeln(timestamped);
-    }
-
+    _fileSink?.writeln(timestamped);
     _streamController.add(timestamped);
 
-    if (!service.disable && !printRawMessage && !noPrint) {
-      stdout.writeln(printTimestamp ? timestamped : formatted);
-    }
+    if (service.disable || noPrint) return;
 
-    if (printRawMessage) {
-      stdout.writeln(message);
+    final output = printRawMessage
+        ? message
+        : (printTimestamp
+              ? timestamped
+              : _formatLine(service, level, message, style: style));
+
+    if (stdout.hasTerminal && _activeTasks.isNotEmpty) {
+      for (var i = 0; i < _activeTasks.length; i++) {
+        stdout.write('\x1B[1A\x1B[2K');
+      }
+
+      stdout.writeln(output);
+
+      for (var taskLine in _activeTasks.values) {
+        stdout.writeln(taskLine);
+      }
+
+      stdout.write('\x1B[G');
+    } else {
+      stdout.writeln(output);
     }
   }
 
@@ -234,15 +242,19 @@ class Logger {
     Future<T> Function() task, {
     LogStyle? style,
   }) async {
+    final id = _taskIdCounter++;
     final stopwatch = Stopwatch()..start();
 
-    void render() {
+    if (stdout.hasTerminal) {
+      _activeTasks[id] = "";
+      stdout.writeln();
+    }
+
+    void updateDisplay() {
       if (service.disable || !stdout.hasTerminal) return;
 
       final elapsed = (stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1);
-
       final timedMessage = '$message (${elapsed}s)';
-
       final formatted = _formatLine(
         service,
         level,
@@ -251,45 +263,53 @@ class Logger {
         includeTimestamp: printTimestamp,
       );
 
-      stdout.write('\r\x1B[2K$formatted');
+      _activeTasks[id] = formatted;
+
+      final keys = _activeTasks.keys.toList();
+      int linesUp = keys.length - keys.indexOf(id);
+
+      stdout.write('\x1B[${linesUp}A\r\x1B[2K$formatted\x1B[${linesUp}B\r');
     }
 
-    render();
-
     final timer = Timer.periodic(
-      const Duration(milliseconds: 50),
-      (_) => render(),
+      const Duration(milliseconds: 100),
+      (_) => updateDisplay(),
     );
 
     try {
       final result = await task();
-
       timer.cancel();
-      stopwatch.stop();
+      _removeTask(id);
 
-      if (stdout.hasTerminal) {
-        stdout.write('\r\x1B[2K');
-      }
+      final ms = stopwatch.elapsedMilliseconds;
+      final sec = (ms / 1000).toStringAsFixed(2);
 
-      log(
-        service,
-        level,
-        '$message (${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s|${stopwatch.elapsedMilliseconds}ms)',
-        style: style,
-      );
+      final timeReport = '[${sec.padLeft(6)}s | ${ms.toString().padLeft(6)}ms]';
 
+      log(service, level, '$timeReport $message', style: style);
       return result;
     } catch (e) {
       timer.cancel();
-      stopwatch.stop();
-
-      if (stdout.hasTerminal) {
-        stdout.write('\r\x1B[2K');
-      }
-
+      _removeTask(id);
       log(service, level, '$message FAILED', style: style);
-
       rethrow;
+    }
+  }
+
+  void _removeTask(int id) {
+    if (!stdout.hasTerminal) {
+      _activeTasks.remove(id);
+      return;
+    }
+
+    for (var i = 0; i < _activeTasks.length; i++) {
+      stdout.write('\x1B[1A\x1B[2K');
+    }
+
+    _activeTasks.remove(id);
+
+    for (var taskLine in _activeTasks.values) {
+      stdout.writeln(taskLine);
     }
   }
 
