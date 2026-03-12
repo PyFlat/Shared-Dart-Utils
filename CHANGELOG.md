@@ -1,3 +1,7 @@
+## 0.0.5
+
+- Added tooManyRequests response to JsonResponse
+
 ## 0.0.4
 
 - Added isolate forward port to make it possible to log from within an isolate

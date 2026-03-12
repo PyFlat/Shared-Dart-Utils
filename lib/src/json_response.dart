@@ -40,6 +40,12 @@ extension JsonResponse on Response {
     headers: {'Content-Type': 'application/json'},
   );
 
+  static Response tooManyRequests(Object? body) => Response(
+    429,
+    body: jsonEncode(body),
+    headers: {'Content-Type': 'application/json'},
+  );
+
   static Response serviceUnavailable(Object? body) => Response(
     503,
     body: jsonEncode(body),
