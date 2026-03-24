@@ -36,7 +36,12 @@ void main() async {
   logger.api.timed('Fetching data from API', () async {
     await Future.delayed(Duration(seconds: 5));
     return 'Data fetched';
-  });
+  }, style: LogStyle.italic + LogStyle.underline);
+
+  logger.db.timed('Running database query', () async {
+    await Future.delayed(Duration(seconds: 3));
+    return 'Query result';
+  }, noPrint: true);
 
   logger.db.warn("Database connection is slow");
   logger.app.error("Unhandled exception occurred");

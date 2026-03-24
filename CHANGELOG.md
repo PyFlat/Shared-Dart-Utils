@@ -1,3 +1,9 @@
+## 0.0.6
+
+- No-Print now also works for timed logs
+- Styles no get applied for timed logs
+- Running timed logs from within an isolate should work now
+
 ## 0.0.5
 
 - Added tooManyRequests response to JsonResponse

@@ -258,7 +258,31 @@ class Logger {
     String message,
     Future<T> Function() task, {
     LogStyle? style,
+    bool noPrint = false,
   }) async {
+    if (isolateForwardPort != null || noPrint) {
+      final stopwatch = Stopwatch()..start();
+      try {
+        final result = await task();
+        final ms = stopwatch.elapsedMilliseconds;
+        final sec = (ms / 1000).toStringAsFixed(2);
+        final timeReport =
+            '[${sec.padLeft(6)}s | ${ms.toString().padLeft(6)}ms]';
+
+        log(
+          service,
+          level,
+          '$timeReport $message',
+          style: style,
+          noPrint: noPrint,
+        );
+        return result;
+      } catch (e) {
+        log(service, level, '$message FAILED', style: style, noPrint: noPrint);
+        rethrow;
+      }
+    }
+
     final id = _taskIdCounter++;
     final stopwatch = Stopwatch()..start();
 
@@ -419,5 +443,13 @@ class ServiceLogger {
     Future<T> Function() task, {
     LogLevel level = LogLevel.info,
     LogStyle? style,
-  }) => _logger.timedTask(service, level, message, task);
+    bool noPrint = false,
+  }) => _logger.timedTask(
+    service,
+    level,
+    message,
+    task,
+    style: style,
+    noPrint: noPrint,
+  );
 }
