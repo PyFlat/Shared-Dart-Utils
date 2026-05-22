@@ -9,7 +9,7 @@ class ConvertToNamedParameters extends ResolvedCorrectionProducer {
   static const _fixKind = FixKind(
     'pyflat_shared_utils.fix.convertToNamed',
     DartFixKindPriority.standard,
-    "Convert to named parameters",
+    "Convert to named parameters to resolve ambiguity",
   );
 
   ConvertToNamedParameters({required super.context});
@@ -36,7 +36,7 @@ class ConvertToNamedParameters extends ResolvedCorrectionProducer {
           for (var i = 0; i < params.length; i++) {
             final p = params[i];
 
-            if (p.isPositional) {
+            if (p.isRequiredPositional) {
               builder.write('required ');
             }
 

@@ -5,19 +5,19 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/error/error.dart';
 
-class ForceNamedParameters extends AnalysisRule {
+class AvoidAmbiguousPositionalParameters extends AnalysisRule {
   static const LintCode code = LintCode(
-    'force_named_parameters',
-    'Too many positional parameters ({0}).',
+    'avoid_ambiguous_positional_parameters',
+    'Multiple positional parameters share the same type ({0}).',
     correctionMessage:
         "Use named parameters when there are more than one positional parameter.",
   );
 
-  ForceNamedParameters()
+  AvoidAmbiguousPositionalParameters()
     : super(
-        name: 'force_named_parameters',
+        name: 'avoid_ambiguous_positional_parameters',
         description:
-            'Enforce the use of named parameters when there are more than one positional parameter.',
+            'Avoid multiple positional parameters with the same type to prevent ambiguity at the call site.',
       );
 
   @override
@@ -53,15 +53,24 @@ class _Visitor extends SimpleAstVisitor<void> {
   void _checkParameters(FormalParameterList? parameterList) {
     if (parameterList == null) return;
 
-    final positionalParams = parameterList.parameters
-        .where((p) => p.isPositional)
-        .toList();
+    final positionalParams = parameterList.parameters.where(
+      (p) => p.isPositional,
+    );
+    final seenTypes = <String>{};
 
-    if (positionalParams.length > 1) {
-      rule.reportAtNode(
-        parameterList,
-        arguments: [positionalParams.length.toString()],
-      );
+    for (final param in positionalParams) {
+      final element = param.declaredFragment?.element;
+
+      String typeString = element?.type.getDisplayString() ?? 'dynamic';
+
+      if (typeString.endsWith('?')) {
+        typeString = typeString.substring(0, typeString.length - 1);
+      }
+
+      if (!seenTypes.add(typeString)) {
+        rule.reportAtNode(parameterList, arguments: [typeString]);
+        return;
+      }
     }
   }
 }
