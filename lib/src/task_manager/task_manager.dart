@@ -95,6 +95,7 @@ class TaskManager<TContext extends TaskContext> {
         'workerId': i,
         'initPort': initPort.sendPort,
         'resultPort': _mainReceivePort.sendPort,
+        'forwardLogs': _logger != null,
       });
       _isolates.add(isolate);
     }
@@ -102,6 +103,10 @@ class TaskManager<TContext extends TaskContext> {
 
   void _listenToResults() {
     _mainReceivePort.listen((message) {
+      if (message is Map && message['type'] == 'log') {
+        _forwardIsolateLog(message);
+        return;
+      }
       if (message is TaskResult) {
         if (_activeIsolateTasks.containsKey(message.taskName)) {
           final completer = _activeIsolateTasks.remove(message.taskName)!;
@@ -138,6 +143,36 @@ class TaskManager<TContext extends TaskContext> {
         }
       }
     });
+  }
+
+  void _forwardIsolateLog(Map<dynamic, dynamic> message) {
+    final logger = _logger?.logger;
+    if (logger == null) return;
+
+    final serviceName = message['service'] as String;
+    final levelName = message['level'] as String;
+    final text = message['message'] as String;
+    final styleAnsi = message['style'] as String? ?? '';
+    final printRawMessage = message['printRawMessage'] as bool? ?? false;
+    final noPrint = message['noPrint'] as bool? ?? false;
+
+    final level = LogLevel.values.firstWhere(
+      (l) => l.name == levelName,
+      orElse: () => LogLevel.info,
+    );
+    final service = logger.services.firstWhere(
+      (s) => s.name == serviceName,
+      orElse: () => LogService(serviceName),
+    );
+
+    logger.log(
+      service,
+      level,
+      text,
+      style: styleAnsi.isEmpty ? null : LogStyle.custom(styleAnsi),
+      printRawMessage: printRawMessage,
+      noPrint: noPrint,
+    );
   }
 
   void registerTask(
@@ -325,6 +360,11 @@ void _persistentWorkerLoop<TContext extends TaskContext>(
   final int workerId = initData['workerId'];
   final SendPort initPort = initData['initPort'];
   final SendPort resultPort = initData['resultPort'];
+  final bool forwardLogs = initData['forwardLogs'] as bool? ?? false;
+
+  if (forwardLogs) {
+    Logger.configureIsolateForwarding(resultPort);
+  }
 
   final workerReceivePort = ReceivePort();
   initPort.send(workerReceivePort.sendPort);

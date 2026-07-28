@@ -1,3 +1,7 @@
+## 0.0.9
+
+- Fixed `TaskManager` isolate-mode tasks corrupting `Logger` output
+
 ## 0.0.8
 
 - Added Task-Manager

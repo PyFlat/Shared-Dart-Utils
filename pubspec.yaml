@@ -1,6 +1,6 @@
 name: pyflat_shared_utils
 description: A collection of shared utilities for Dart Console projects.
-version: 0.0.8
+version: 0.0.9
 repository: https://github.com/PyFlat/Shared-Dart-Utils
 
 environment:

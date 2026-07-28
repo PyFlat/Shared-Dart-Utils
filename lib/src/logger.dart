@@ -93,6 +93,14 @@ class Logger {
 
   SendPort? isolateForwardPort;
 
+  static SendPort? _ambientIsolateForwardPort;
+
+  static void configureIsolateForwarding(SendPort port) {
+    _ambientIsolateForwardPort = port;
+  }
+
+  bool get _canRedraw => stdout.hasTerminal && stdout.supportsAnsiEscapes;
+
   Logger({
     required this.services,
     this.writeToFile = true,
@@ -102,7 +110,9 @@ class Logger {
     this.onlyKeepLastLogFiles = -1,
     this.isolateForwardPort,
   }) {
-    if (writeToFile) {
+    isolateForwardPort ??= _ambientIsolateForwardPort;
+
+    if (writeToFile && isolateForwardPort == null) {
       Directory('logs').createSync(recursive: true);
 
       final timestamp = DateFormat(
@@ -122,11 +132,14 @@ class Logger {
             .map((e) => e.name.length)
             .reduce((a, b) => a > b ? a : b)) +
         2;
-    cleanLogs(
-      deleteOldLogFilesOnStartup: deleteOldLogFilesOnStartup,
-      keepDays: keepDays,
-      onlyKeepLastLogFiles: onlyKeepLastLogFiles,
-    );
+
+    if (isolateForwardPort == null) {
+      cleanLogs(
+        deleteOldLogFilesOnStartup: deleteOldLogFilesOnStartup,
+        keepDays: keepDays,
+        onlyKeepLastLogFiles: onlyKeepLastLogFiles,
+      );
+    }
   }
 
   void cleanLogs({
@@ -166,12 +179,28 @@ class Logger {
     }
   }
 
+  int? get _terminalWidth {
+    if (!_canRedraw) return null;
+    try {
+      return stdout.terminalColumns;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _clipToWidth(String text, int maxWidth) {
+    if (maxWidth <= 0 || text.length <= maxWidth) return text;
+    if (maxWidth == 1) return '…';
+    return '${text.substring(0, maxWidth - 1)}…';
+  }
+
   String _formatLine(
     LogService service,
     LogLevel level,
     String message, {
     LogStyle? style,
     bool includeTimestamp = false,
+    int? maxWidth,
   }) {
     final timestamp = DateFormat(
       "yyyy.MM.dd-HH:mm:ss.SSS",
@@ -187,7 +216,11 @@ class Logger {
 
     final baseLine = '$levelStr$serviceStr $message';
 
-    final rawLine = includeTimestamp ? '[$timestamp]$baseLine' : baseLine;
+    var rawLine = includeTimestamp ? '[$timestamp]$baseLine' : baseLine;
+
+    if (maxWidth != null) {
+      rawLine = _clipToWidth(rawLine, maxWidth > 1 ? maxWidth - 1 : maxWidth);
+    }
 
     final effectiveStyle =
         (style ?? _defaultLevelStyle[level] ?? LogStyle.none);
@@ -229,13 +262,27 @@ class Logger {
 
     if (service.disable || noPrint) return;
 
-    final output = printRawMessage
-        ? message
-        : (printTimestamp
-              ? timestamped
-              : _formatLine(service, level, message, style: style));
+    if (_canRedraw && _activeTasks.isNotEmpty) {
+      final maxWidth = _terminalWidth;
+      final output = printRawMessage
+          ? (maxWidth != null ? _clipToWidth(message, maxWidth) : message)
+          : (printTimestamp
+                ? _formatLine(
+                    service,
+                    level,
+                    message,
+                    style: style,
+                    includeTimestamp: true,
+                    maxWidth: maxWidth,
+                  )
+                : _formatLine(
+                    service,
+                    level,
+                    message,
+                    style: style,
+                    maxWidth: maxWidth,
+                  ));
 
-    if (stdout.hasTerminal && _activeTasks.isNotEmpty) {
       for (var i = 0; i < _activeTasks.length; i++) {
         stdout.write('\x1B[1A\x1B[2K');
       }
@@ -248,6 +295,11 @@ class Logger {
 
       stdout.write('\x1B[G');
     } else {
+      final output = printRawMessage
+          ? message
+          : (printTimestamp
+                ? timestamped
+                : _formatLine(service, level, message, style: style));
       stdout.writeln(output);
     }
   }
@@ -286,13 +338,13 @@ class Logger {
     final id = _taskIdCounter++;
     final stopwatch = Stopwatch()..start();
 
-    if (stdout.hasTerminal) {
+    if (_canRedraw) {
       _activeTasks[id] = "";
       stdout.writeln();
     }
 
     void updateDisplay() {
-      if (service.disable || !stdout.hasTerminal) return;
+      if (service.disable || !_canRedraw) return;
 
       final elapsed = (stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1);
       final timedMessage = '$message (${elapsed}s)';
@@ -302,6 +354,7 @@ class Logger {
         timedMessage,
         style: style,
         includeTimestamp: printTimestamp,
+        maxWidth: _terminalWidth,
       );
 
       _activeTasks[id] = formatted;
@@ -338,7 +391,7 @@ class Logger {
   }
 
   void _removeTask(int id) {
-    if (!stdout.hasTerminal) {
+    if (!_canRedraw) {
       _activeTasks.remove(id);
       return;
     }
@@ -367,6 +420,8 @@ class ServiceLogger {
   final LogService service;
 
   const ServiceLogger(this._logger, this.service);
+
+  Logger get logger => _logger;
 
   void debug(
     String m, {
