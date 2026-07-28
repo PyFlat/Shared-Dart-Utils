@@ -1,3 +1,7 @@
+## 0.0.8
+
+- Added Task-Manager
+
 ## 0.0.7
 
 - Renamed `force_named_parameters` to `avoid_ambiguous_positional_parameters` to refine the rule's scope and eliminate unwanted warnings

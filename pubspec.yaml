@@ -1,6 +1,6 @@
 name: pyflat_shared_utils
 description: A collection of shared utilities for Dart Console projects.
-version: 0.0.7
+version: 0.0.8
 repository: https://github.com/PyFlat/Shared-Dart-Utils
 
 environment:
@@ -9,20 +9,24 @@ environment:
 # Add regular dependencies here.
 dependencies:
   analysis_server_plugin: ^0.3.10
-  analyzer: ^14.1.0
-  analyzer_plugin: ^0.14.4
+
+  analyzer: ^13.3.0
+  analyzer_plugin: ^0.14.12
   build: ^4.0.4
   intl: ^0.20.2
+  json_annotation: ^4.12.0
+
   path: ^1.9.0
   shelf: ^1.4.2
   source_gen: ^4.2.0
 
 dev_dependencies:
-  analyzer_testing: ^0.3.4
   build_runner: ^2.10.5
   lints: ^6.0.0
   test: ^1.25.6
   test_reflective_loader: ^0.4.0
+  json_serializable: ^6.14.0
+  analyzer_testing: ^0.3.2
 
 plugin:
   platforms:
