@@ -1,3 +1,7 @@
+## 0.0.10
+
+- Added `RateLimiter`
+
 ## 0.0.9
 
 - Fixed `TaskManager` isolate-mode tasks corrupting `Logger` output
