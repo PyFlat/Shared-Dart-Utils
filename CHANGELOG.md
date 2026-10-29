@@ -1,3 +1,8 @@
+## 0.0.11
+
+- Upgraded to `build` 5 (dependents now need a `build` 5 compatible toolchain)
+- Upgraded dev dependencies `analyzer_testing` and `test_reflective_loader`
+
 ## 0.0.10
 
 - Added `RateLimiter`
