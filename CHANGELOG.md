@@ -1,3 +1,7 @@
+## 0.0.12
+
+- Fixed `[CRITICAL]` log lines having no space between level and service
+
 ## 0.0.11
 
 - Upgraded to `build` 5 (dependents now need a `build` 5 compatible toolchain)

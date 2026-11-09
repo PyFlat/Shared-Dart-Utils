@@ -131,7 +131,7 @@ class Logger {
         (LogLevel.values
             .map((e) => e.name.length)
             .reduce((a, b) => a > b ? a : b)) +
-        2;
+        3;
 
     if (isolateForwardPort == null) {
       cleanLogs(
