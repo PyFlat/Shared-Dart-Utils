@@ -6,6 +6,7 @@ class ScheduledTask<TContext extends TaskContext> {
   final String name;
   final Duration interval;
   final bool noPrint;
+  final bool skipIfRunning;
   final bool requiresContext;
   final FutureOr<dynamic> Function()? task;
   final FutureOr<dynamic> Function(TContext context)? contextTask;
@@ -16,6 +17,7 @@ class ScheduledTask<TContext extends TaskContext> {
     this.interval,
     FutureOr<dynamic> Function() this.task, {
     this.noPrint = false,
+    this.skipIfRunning = false,
   }) : requiresContext = false,
        contextTask = null;
 
@@ -24,6 +26,7 @@ class ScheduledTask<TContext extends TaskContext> {
     this.interval,
     FutureOr<dynamic> Function(TContext context) this.contextTask, {
     this.noPrint = false,
+    this.skipIfRunning = false,
   }) : requiresContext = true,
        task = null;
 }

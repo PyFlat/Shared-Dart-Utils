@@ -9,6 +9,7 @@ part of 'task_result.dart';
 TaskResult _$TaskResultFromJson(Map<String, dynamic> json) => TaskResult(
   taskName: json['taskName'] as String,
   success: json['success'] as bool,
+  handled: json['handled'] as bool? ?? false,
   result: json['result'],
   error: json['error'],
   elapsedMilliseconds: (json['elapsedMilliseconds'] as num).toInt(),
@@ -20,6 +21,7 @@ Map<String, dynamic> _$TaskResultToJson(TaskResult instance) =>
     <String, dynamic>{
       'taskName': instance.taskName,
       'success': instance.success,
+      'handled': instance.handled,
       'result': instance.result,
       'error': instance.error,
       'elapsedMilliseconds': instance.elapsedMilliseconds,

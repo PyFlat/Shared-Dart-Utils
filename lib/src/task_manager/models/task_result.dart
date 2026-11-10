@@ -6,6 +6,7 @@ part 'task_result.g.dart';
 class TaskResult {
   final String taskName;
   final bool success;
+  final bool handled;
   final dynamic result;
   final dynamic error;
   final int elapsedMilliseconds;
@@ -15,6 +16,7 @@ class TaskResult {
   TaskResult({
     required this.taskName,
     required this.success,
+    this.handled = false,
     this.result,
     this.error,
     required this.elapsedMilliseconds,

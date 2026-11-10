@@ -9,6 +9,24 @@ import 'models/task_result.dart';
 
 enum TaskMode { main, isolate }
 
+/// Runs inside the worker isolate for isolate tasks, so it must be sendable.
+typedef TaskErrorHandler =
+    bool Function(String taskName, Object error, StackTrace stack);
+
+bool _callErrorHandler(
+  TaskErrorHandler? handler,
+  String taskName,
+  Object error,
+  StackTrace stack,
+) {
+  if (handler == null) return false;
+  try {
+    return handler(taskName, error, stack);
+  } catch (_) {
+    return false;
+  }
+}
+
 class _TaskWorkRequest<TContext extends TaskContext> {
   final String name;
   final bool noPrint;
@@ -16,6 +34,7 @@ class _TaskWorkRequest<TContext extends TaskContext> {
   final FutureOr<dynamic> Function(TContext context)? contextTask;
   final Map<String, dynamic>? contextJson;
   final TContext Function(Map<String, dynamic> json)? contextFromJson;
+  final TaskErrorHandler? onError;
 
   _TaskWorkRequest({
     required this.name,
@@ -24,6 +43,7 @@ class _TaskWorkRequest<TContext extends TaskContext> {
     this.contextTask,
     this.contextJson,
     this.contextFromJson,
+    this.onError,
   });
 }
 
@@ -38,11 +58,13 @@ class _WorkerState {
 class TaskManager<TContext extends TaskContext> {
   final FutureOr<TContext> Function()? contextProvider;
   final TContext Function(Map<String, dynamic> json)? contextFromJson;
+  final TaskErrorHandler? onError;
 
   final ReceivePort _mainReceivePort = ReceivePort();
   final Map<String, Timer> _timers = {};
   final Map<String, Function(dynamic)> _callbacks = {};
   final Map<String, Completer<dynamic>> _activeIsolateTasks = {};
+  final Set<String> _running = {};
 
   final ServiceLogger? _logger;
   final int _poolSize;
@@ -54,6 +76,7 @@ class TaskManager<TContext extends TaskContext> {
   TaskManager({
     this.contextProvider,
     this.contextFromJson,
+    this.onError,
     this._logger,
     this._poolSize = 3,
   }) : assert(
@@ -120,7 +143,7 @@ class TaskManager<TContext extends TaskContext> {
           if (_callbacks.containsKey(message.taskName)) {
             _callbacks[message.taskName]!(message.result);
           }
-        } else {
+        } else if (!message.handled) {
           _logger?.error('Task "${message.taskName}" failed: ${message.error}');
         }
         if (message.workerId != -1) {
@@ -191,11 +214,11 @@ class TaskManager<TContext extends TaskContext> {
     }
 
     _timers[task.name] = Timer.periodic(task.interval, (_) {
-      mode == TaskMode.main ? _runInMain(task) : _runInCpu(task);
+      _run(task, mode);
     });
 
     if (runImmediately) {
-      mode == TaskMode.main ? _runInMain(task) : _runInCpu(task);
+      _run(task, mode);
     }
 
     _logger?.info(
@@ -254,6 +277,19 @@ class TaskManager<TContext extends TaskContext> {
     }
   }
 
+  void _run(ScheduledTask<TContext> task, TaskMode mode) {
+    if ((task.skipIfRunning || mode == TaskMode.isolate) &&
+        _running.contains(task.name)) {
+      _logger?.debug(
+        'Skipped task "${task.name}", previous run still active',
+        noPrint: task.noPrint,
+      );
+      return;
+    }
+    _running.add(task.name);
+    mode == TaskMode.main ? _runInMain(task) : _runInCpu(task);
+  }
+
   void _runInMain(ScheduledTask<TContext> task) async {
     final stopwatch = Stopwatch()..start();
     try {
@@ -279,24 +315,43 @@ class TaskManager<TContext extends TaskContext> {
         ),
       );
     } catch (e, st) {
+      final handled = _callErrorHandler(onError, task.name, e, st);
       _mainReceivePort.sendPort.send(
         TaskResult(
           taskName: task.name,
           success: false,
-          error: '$e\n$st',
+          handled: handled,
+          error: handled ? null : '$e\n$st',
           elapsedMilliseconds: stopwatch.elapsedMilliseconds,
         ),
       );
+    } finally {
+      _running.remove(task.name);
     }
   }
 
   void _runInCpu(ScheduledTask<TContext> task) async {
+    try {
+      await _runInCpuGuarded(task);
+    } finally {
+      _running.remove(task.name);
+    }
+  }
+
+  Future<void> _runInCpuGuarded(ScheduledTask<TContext> task) async {
     await _workerPoolReady.future;
 
     Map<String, dynamic>? contextJson;
     if (task.requiresContext) {
-      final context = await contextProvider!();
-      contextJson = context.toJson();
+      try {
+        final context = await contextProvider!();
+        contextJson = context.toJson();
+      } catch (e, st) {
+        if (!_callErrorHandler(onError, task.name, e, st)) {
+          _logger?.error('Task "${task.name}" failed: $e\n$st');
+        }
+        return;
+      }
     }
 
     final completer = Completer<dynamic>();
@@ -311,6 +366,7 @@ class TaskManager<TContext extends TaskContext> {
           contextTask: task.contextTask,
           contextJson: contextJson,
           contextFromJson: contextFromJson,
+          onError: onError,
         );
 
         _WorkerState? idleWorker;
@@ -395,11 +451,13 @@ void _persistentWorkerLoop<TContext extends TaskContext>(
         );
       } catch (e, st) {
         stopwatch.stop();
+        final handled = _callErrorHandler(message.onError, message.name, e, st);
         resultPort.send(
           TaskResult(
             taskName: message.name,
             success: false,
-            error: '$e\n$st',
+            handled: handled,
+            error: handled ? null : '$e\n$st',
             elapsedMilliseconds: stopwatch.elapsedMilliseconds,
             workerId: workerId,
           ),

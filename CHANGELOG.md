@@ -1,3 +1,9 @@
+## 0.0.13
+
+- Added `onError` to `TaskManager`: return `true` to mark an error as handled so it is not logged (runs inside the worker for isolate tasks)
+- Added `ScheduledTask.skipIfRunning` to skip a run while the previous one is still active; isolate tasks always skip
+- Fixed a failing `contextProvider` in isolate mode causing an unhandled async error
+
 ## 0.0.12
 
 - Fixed `[CRITICAL]` log lines having no space between level and service
