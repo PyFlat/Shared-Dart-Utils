@@ -168,4 +168,35 @@ void main() {
     release.complete();
     expect(started, greaterThan(1));
   });
+
+  group('registerTasks', () {
+    late TaskManager<_Ctx> manager;
+
+    setUp(() => manager = TaskManager<_Ctx>(logger: _log, poolSize: 1));
+    tearDown(() => manager.dispose());
+
+    test('runs tasks flagged runImmediately right away', () async {
+      final ran = <String>[];
+      manager.registerTasks([
+        ScheduledTask(
+          'now',
+          const Duration(hours: 1),
+          () => ran.add('now'),
+          runImmediately: true,
+        ),
+        ScheduledTask(
+          'later',
+          const Duration(hours: 1),
+          () => ran.add('later'),
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(ran, ['now']);
+    });
+
+    test('rejects duplicate names', () {
+      final task = ScheduledTask<_Ctx>('dup', const Duration(hours: 1), () {});
+      expect(() => manager.registerTasks([task, task]), throwsException);
+    });
+  });
 }

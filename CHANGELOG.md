@@ -1,3 +1,8 @@
+## 0.0.14
+
+- Added `mode` and `runImmediately` to `ScheduledTask` and `TaskManager.registerTasks` to register a list of tasks; the `registerTask` parameters still override them
+- `TaskMode` now lives next to `ScheduledTask` (still exported from the package)
+
 ## 0.0.13
 
 - Added `onError` to `TaskManager`: return `true` to mark an error as handled so it is not logged (runs inside the worker for isolate tasks)

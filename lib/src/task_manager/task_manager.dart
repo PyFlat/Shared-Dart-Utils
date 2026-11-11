@@ -7,8 +7,6 @@ import 'models/scheduled_task.dart';
 import 'models/task_context.dart';
 import 'models/task_result.dart';
 
-enum TaskMode { main, isolate }
-
 /// Runs inside the worker isolate for isolate tasks, so it must be sendable.
 typedef TaskErrorHandler =
     bool Function(String taskName, Object error, StackTrace stack);
@@ -198,12 +196,19 @@ class TaskManager<TContext extends TaskContext> {
     );
   }
 
+  void registerTasks(Iterable<ScheduledTask<TContext>> tasks) {
+    for (final task in tasks) {
+      registerTask(task);
+    }
+  }
+
   void registerTask(
     ScheduledTask<TContext> task, {
-    TaskMode mode = TaskMode.main,
-    bool runImmediately = false,
+    TaskMode? mode,
+    bool? runImmediately,
     Function(dynamic)? onSuccess,
   }) {
+    final runMode = mode ?? task.mode;
     if (_timers.containsKey(task.name)) {
       throw Exception('Task "${task.name}" already exists');
     }
@@ -214,15 +219,15 @@ class TaskManager<TContext extends TaskContext> {
     }
 
     _timers[task.name] = Timer.periodic(task.interval, (_) {
-      _run(task, mode);
+      _run(task, runMode);
     });
 
-    if (runImmediately) {
-      _run(task, mode);
+    if (runImmediately ?? task.runImmediately) {
+      _run(task, runMode);
     }
 
     _logger?.info(
-      'Registered task "${task.name}" every ${task.interval.inSeconds}s (mode: $mode)',
+      'Registered task "${task.name}" every ${task.interval.inSeconds}s (mode: $runMode)',
     );
   }
 
